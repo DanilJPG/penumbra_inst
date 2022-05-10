@@ -1,0 +1,101 @@
+#####Updating and installing dependencies#####
+sudo apt update && sudo apt upgrade -y
+sudo apt install git tmux pkg-config cargo build-essential libssl-dev  clang jq -y
+#####Installation RUST#####
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source ~/.cargo/env
+reboot
+#####RUST updates#####
+rustup default nightly
+#####Installation PCLI#####
+#####clone repo#####
+git clone https://github.com/penumbra-zone/penumbra
+cd penumbra && git checkout 013kore-cyllene && cargo update
+#####build pcli#####
+cargo build --release --bin pcli
+#####generate wallet#####
+cargo run --quiet --release --bin pcli wallet generate
+save penumbra_wallet.json from /root/.local/share/pcli/
+
+#####enabling loggings export#####
+export RUST_LOG=info
+####Test tokens####
+####Synchronization#####
+cargo run --quiet --release --bin pcli sync
+####wallet adress####
+cargo run --quiet --release --bin pcli addr list
+####Go to discord and request tokens in the -testnet-faucet branch#####
+####Checking the balance####
+cargo run --quiet --release --bin pcli balance
+####Transaction testing######
+
+#####Delegation to a validator#####
+
+#####The validator list can be viewed as follows#####
+cargo run --quiet --release --bin pcli stake list-validators
+#####Choose one and send him tokens (With the command below I chose the last one and sent him 20 tokens)###### 
+cargo run --quiet --release --bin pcli stake delegate 20penumbra --to penumbravalid19mwsy9cw8dlj9xg3q5q7s6dzlvcfgkqxpke9yn5zs5uwgz4zdvzqetqvlk
+###check####
+cargo run --quiet --release --bin pcli stake show
+#####Taking our tokens from the validator####
+cargo run --quiet --release --bin pcli stake undelegate 1delegation_penumbravalid19mwsy9cw8dlj9xg3q5q7s6dzlvcfgkqxpke9yn5zs5uwgz4zdvzqetqvlk
+####Launching a node#####
+
+######Installing Go#####
+wget https://golang.org/dl/go1.17.5.linux-amd64.tar.gz; \
+rm -rv /usr/local/go; \
+tar -C /usr/local -xzf go1.17.5.linux-amd64.tar.gz && \
+rm -v go1.17.5.linux-amd64.tar.gz && \
+echo "export PATH=$PATH:/usr/local/go/bin:$HOME/go/bin" >> ~/.bash_profile && \
+source ~/.bash_profile && \
+go version
+####build pd####
+cargo build --release --bin pd
+########Tendermint######
+cd $HOME && git clone https://github.com/tendermint/tendermint.git && cd tendermint
+git checkout v0.35.4
+make install
+tendermint version
+####initializing#####
+tendermint init full
+#######Add peers#####
+
+######Get NODEID#####
+curl -s http://testnet.penumbra.zone:26657/status | jq ".result.node_info.id"
+#####Open the file####
+#####Find the line persistent-peers and enter there the nodeid from the previous command in the following format####
+###persistent-peers = "NODE_ID@testnet.penumbra.zone:26656"###
+###Rocking Genesis###
+curl -s http://testnet.penumbra.zone:26657/genesis | jq ".result.genesis" > $HOME/.tendermint/config/genesis.json
+###Running the PD###
+cd $HOME/penumbra && tmux new-session -s pd
+
+export RUST_LOG="warn,pd=debug,penumbra=debug,jmt=info"
+
+cargo run --release --bin pd start --rocks-path $HOME/.rocksdb
+###Сворачиваем сессию: CTRL+B , D###
+####Starting Tendermint in a new session####
+tmux new-session -s tendermint
+tendermint start
+###Minimize the session: CTRL+B , D###
+###Validator###
+#Open again `/root/.tendermint/config/config.toml` and look for the line `mode = "full"`#
+#Change the value to `mode = "validator"`#
+tmux kill-server
+cd $HOME/penumbra && tmux new-session -s pd
+export RUST_LOG="warn,pd=debug,penumbra=debug,jmt=info"
+cargo run --release --bin pd start --rocks-path $HOME/.rocksdb
+###Minimize the session: CTRL+B , D###
+tmux new-session -s tendermint
+tendermint init validator
+cargo run --release --bin pcli -- validator template-definition --file validator.json
+###CTRL+B, D###
+grep -A3 pub_key ~/.tendermint/config/priv_validator_key.json
+###Find the type and value parameters and paste them into the file /root/penumbra/validator.json###
+cargo run --release --bin pcli -- validator upload-definition --file validator.json
+###Having yourself on the list of validators###
+cargo run --release --bin pcli -- stake list-validators -i
+###Stack the tokens in your validator (change the address to yours that you just saw in the list)###
+cargo run --release --bin pcli -- stake delegate 900penumbra --to penumbravalid13rqj5qnqs7l7ecv3dt3mt8q4msc72uwxykv3467pnaxtlc7ancrs0w7shn
+
+

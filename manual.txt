@@ -1,12 +1,15 @@
 #####Updating and installing dependencies#####
 sudo apt update && sudo apt upgrade -y
 sudo apt install git tmux pkg-config cargo build-essential libssl-dev  clang jq -y
+
 #####Installation RUST#####
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source ~/.cargo/env
 reboot
+
 #####RUST updates#####
 rustup default nightly
+
 #####Installation PCLI#####
 #####clone repo#####
 git clone https://github.com/penumbra-zone/penumbra
@@ -78,6 +81,7 @@ cargo run --release --bin pd start --rocks-path $HOME/.rocksdb
 tmux new-session -s tendermint
 tendermint start
 ###Minimize the session: CTRL+B , D###
+
 ###Validator###
 #Open again `/root/.tendermint/config/config.toml` and look for the line `mode = "full"`#
 #Change the value to `mode = "validator"`#
